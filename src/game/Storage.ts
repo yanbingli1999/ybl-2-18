@@ -1,13 +1,5 @@
-import { GameSave, PlayerState, VehicleState, WeatherState, Order, IncomeRecord, MapData } from './types';
+import { GameSave, PlayerState, VehicleState, WeatherState, Order, IncomeRecord, MapData, TutorialProgress } from './types';
 import { STORAGE_KEY, SAVE_VERSION, TUTORIAL_KEY } from './constants';
-
-export interface TutorialProgress {
-  acceptedOrder: boolean;
-  pickedUpOrder: boolean;
-  deliveredOrder: boolean;
-  savedGame: boolean;
-  collapsed: boolean;
-}
 
 export function saveGame(
   player: PlayerState,

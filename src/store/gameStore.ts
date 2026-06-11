@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { GameState, GameAction, GameSave, Order } from '../game/types';
+import type { GameState, GameAction, GameSave, Order, TutorialProgress } from '../game/types';
 import { generateMapData, findPath } from '../game/mapData';
 import { generateOrder, updateOrderDeadlines, isAtLocation, canAcceptOrder } from '../game/OrderSystem';
 import { updateWeather, createInitialWeather } from '../game/WeatherSystem';
@@ -20,9 +20,36 @@ import {
   ORDER_GENERATION_INTERVAL,
 } from '../game/constants';
 
+function createFreshTutorial(): TutorialProgress {
+  const saved = getTutorialProgress();
+  return {
+    acceptedOrder: false,
+    pickedUpOrder: false,
+    deliveredOrder: false,
+    savedGame: false,
+    collapsed: saved.collapsed,
+  };
+}
+
+function deriveTutorialFromSave(save: GameSave): TutorialProgress {
+  const saved = getTutorialProgress();
+  const completedOrders = save.player.completedOrders;
+  const hasCurrentOrder = save.player.currentOrderId !== null;
+  const currentOrder = hasCurrentOrder
+    ? save.orders.find((o) => o.id === save.player.currentOrderId)
+    : null;
+  return {
+    acceptedOrder: saved.acceptedOrder || completedOrders > 0 || hasCurrentOrder,
+    pickedUpOrder: saved.pickedUpOrder || completedOrders > 0 || currentOrder?.status === 'pickedup' || currentOrder?.status === 'delivering',
+    deliveredOrder: saved.deliveredOrder || completedOrders > 0,
+    savedGame: saved.savedGame || true,
+    collapsed: saved.collapsed,
+  };
+}
+
 export function createInitialState(): GameState {
   const map = generateMapData();
-  const tutorialProgress = getTutorialProgress();
+  const tutorial = createFreshTutorial();
   return {
     player: {
       id: 'player-1',
@@ -49,7 +76,8 @@ export function createInitialState(): GameState {
     isCharging: false,
     isRepairing: false,
     isResting: false,
-    hasSavedGame: tutorialProgress.savedGame,
+    hasSavedGame: tutorial.savedGame,
+    tutorial,
   };
 }
 
@@ -113,6 +141,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         ),
         player: { ...state.player, currentOrderId: action.orderId },
         plannedPath: path,
+        tutorial: { ...state.tutorial, acceptedOrder: true },
       };
     }
 
@@ -137,6 +166,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           o.id === action.orderId ? { ...o, status: 'pickedup' as const } : o
         ),
         plannedPath: path,
+        tutorial: { ...state.tutorial, acceptedOrder: true, pickedUpOrder: true },
       };
     }
 
@@ -164,6 +194,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         showSettlement: true,
         lastSettlement: settlement.record,
         plannedPath: [],
+        tutorial: {
+          ...state.tutorial,
+          acceptedOrder: true,
+          pickedUpOrder: true,
+          deliveredOrder: true,
+        },
       };
     }
 
@@ -303,6 +339,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
     case 'NEW_GAME': {
       const newState = createInitialState();
+      const freshTutorial = createFreshTutorial();
       const initialOrders: typeof newState.orders = [];
       for (let i = 0; i < 3; i++) {
         const order = generateOrder(
@@ -313,11 +350,14 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         );
         if (order) initialOrders.push(order);
       }
-      return { ...newState, orders: initialOrders };
+      saveTutorialProgress(freshTutorial);
+      return { ...newState, orders: initialOrders, tutorial: freshTutorial, hasSavedGame: false };
     }
 
     case 'LOAD_GAME': {
       const save = action.save;
+      const tutorial = deriveTutorialFromSave(save);
+      saveTutorialProgress(tutorial);
       return {
         ...createInitialState(),
         player: save.player,
@@ -327,6 +367,17 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         incomeRecords: save.incomeRecords,
         gameTime: save.gameTime,
         map: save.map,
+        tutorial,
+        hasSavedGame: tutorial.savedGame,
+      };
+    }
+
+    case 'TOGGLE_TUTORIAL': {
+      const collapsed = !state.tutorial.collapsed;
+      saveTutorialProgress({ collapsed });
+      return {
+        ...state,
+        tutorial: { ...state.tutorial, collapsed },
       };
     }
 
@@ -367,19 +418,7 @@ export const useGameStore = create<GameStore>((set, get) => {
     orderGenerationTimer: 0,
 
     dispatch: (action) => {
-      set((state) => {
-        const newState = gameReducer(state, action);
-        if (action.type === 'ACCEPT_ORDER') {
-          saveTutorialProgress({ acceptedOrder: true });
-        }
-        if (action.type === 'PICKUP_ORDER') {
-          saveTutorialProgress({ pickedUpOrder: true });
-        }
-        if (action.type === 'DELIVER_ORDER') {
-          saveTutorialProgress({ deliveredOrder: true });
-        }
-        return newState;
-      });
+      set((state) => gameReducer(state, action));
     },
 
     save: () => {
@@ -394,8 +433,9 @@ export const useGameStore = create<GameStore>((set, get) => {
         state.map
       );
       if (success) {
-        saveTutorialProgress({ savedGame: true });
-        set({ hasSavedGame: true });
+        const tutorialUpdate = { ...state.tutorial, savedGame: true };
+        saveTutorialProgress(tutorialUpdate);
+        set({ hasSavedGame: true, tutorial: tutorialUpdate });
       }
       return success;
     },
@@ -443,3 +483,5 @@ export function useIsNearCharging(): boolean {
 export function useIsNearRepair(): boolean {
   return useGameStore(selectIsNearRepair);
 }
+
+export const selectTutorial = (state: GameState) => state.tutorial;

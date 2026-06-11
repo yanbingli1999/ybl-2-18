@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react';
-import { useGameStore, selectIsNearCharging, selectIsNearRepair, selectCurrentOrder } from '../store/gameStore';
+import { useState } from 'react';
+import { useGameStore, selectIsNearCharging, selectIsNearRepair, selectTutorial, selectCurrentOrder } from '../store/gameStore';
 import { Zap, Wrench, Coffee, Pause, Play, Save, FolderOpen, RotateCcw, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Check, ChevronUp, ChevronDown } from 'lucide-react';
-import { getTutorialProgress, saveTutorialProgress } from '../game/Storage';
 import { useShallow } from 'zustand/react/shallow';
 
 export default function ControlBar({ onOpenSave, setKey }: { onOpenSave: () => void; setKey: (key: string, pressed: boolean) => void }) {
@@ -12,8 +11,7 @@ export default function ControlBar({ onOpenSave, setKey }: { onOpenSave: () => v
   const isResting = useGameStore((state) => state.isResting);
   const saveGame = useGameStore((state) => state.save);
   const loadGame = useGameStore((state) => state.load);
-  const hasSavedGame = useGameStore((state) => state.hasSavedGame);
-  const completedOrders = useGameStore((state) => state.player.completedOrders);
+  const tutorial = useGameStore(useShallow(selectTutorial));
   const currentOrder = useGameStore(useShallow(selectCurrentOrder));
 
   const nearCharging = useGameStore(selectIsNearCharging);
@@ -21,71 +19,43 @@ export default function ControlBar({ onOpenSave, setKey }: { onOpenSave: () => v
 
   const [activeKeys, setActiveKeys] = useState<Set<string>>(new Set());
 
-  const [tutorialCollapsed, setTutorialCollapsed] = useState<boolean>(() => {
-    return getTutorialProgress().collapsed;
-  });
-
-  const [tutorialState, setTutorialState] = useState(() => {
-    const p = getTutorialProgress();
-    return {
-      acceptedOrder: p.acceptedOrder,
-      pickedUpOrder: p.pickedUpOrder,
-      deliveredOrder: p.deliveredOrder,
-      savedGame: p.savedGame,
-    };
-  });
-
-  useEffect(() => {
-    const p = getTutorialProgress();
-    setTutorialState({
-      acceptedOrder: p.acceptedOrder || (currentOrder !== null && completedOrders > 0),
-      pickedUpOrder: p.pickedUpOrder || (currentOrder?.status === 'pickedup' || currentOrder?.status === 'delivering') || completedOrders > 0,
-      deliveredOrder: p.deliveredOrder || completedOrders > 0,
-      savedGame: p.savedGame || hasSavedGame,
-    });
-  }, [currentOrder, completedOrders, hasSavedGame]);
-
-  const handleToggleTutorial = () => {
-    const newCollapsed = !tutorialCollapsed;
-    setTutorialCollapsed(newCollapsed);
-    saveTutorialProgress({ collapsed: newCollapsed });
-  };
-
-  const allTutorialDone =
-    tutorialState.acceptedOrder &&
-    tutorialState.pickedUpOrder &&
-    tutorialState.deliveredOrder &&
-    tutorialState.savedGame;
-
   const tutorialSteps = [
     {
-      key: 'acceptedOrder',
+      key: 'acceptedOrder' as const,
       label: '接第一单',
       hint: '在右侧订单中心点击"接单"按钮',
-      done: tutorialState.acceptedOrder,
+      done: tutorial.acceptedOrder,
     },
     {
-      key: 'pickedUpOrder',
+      key: 'pickedUpOrder' as const,
       label: '到取货点',
       hint: '沿青色虚线行驶到绿色标记处',
-      done: tutorialState.pickedUpOrder,
+      done: tutorial.pickedUpOrder,
     },
     {
-      key: 'deliveredOrder',
+      key: 'deliveredOrder' as const,
       label: '完成送达',
       hint: '继续行驶到红色标记的送货点',
-      done: tutorialState.deliveredOrder,
+      done: tutorial.deliveredOrder,
     },
     {
-      key: 'savedGame',
+      key: 'savedGame' as const,
       label: '保存一次',
       hint: '点击下方"保存"按钮保存进度',
-      done: tutorialState.savedGame,
+      done: tutorial.savedGame,
     },
   ];
 
+  const allTutorialDone =
+    tutorial.acceptedOrder &&
+    tutorial.pickedUpOrder &&
+    tutorial.deliveredOrder &&
+    tutorial.savedGame;
+
   const currentStepIndex = tutorialSteps.findIndex((s) => !s.done);
-  const currentHint = currentStepIndex >= 0 ? tutorialSteps[currentStepIndex].hint : '恭喜！你已完成所有新手任务 🎉';
+  const currentHint = currentStepIndex >= 0
+    ? tutorialSteps[currentStepIndex].hint
+    : '恭喜！你已完成所有新手任务 🎉';
 
   const handleKeyPress = (key: string, pressed: boolean) => {
     setKey(key, pressed);
@@ -159,7 +129,7 @@ export default function ControlBar({ onOpenSave, setKey }: { onOpenSave: () => v
         <div className="border-2 border-game-neon/40 rounded bg-game-night/60">
           <div
             className="flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-game-neon/10 transition-colors"
-            onClick={handleToggleTutorial}
+            onClick={() => dispatch({ type: 'TOGGLE_TUTORIAL' })}
           >
             <div className="flex items-center gap-2">
               <span className="font-pixel text-xs text-game-neon">📝 新手任务</span>
@@ -167,13 +137,13 @@ export default function ControlBar({ onOpenSave, setKey }: { onOpenSave: () => v
                 {tutorialSteps.filter((s) => s.done).length}/{tutorialSteps.length}
               </span>
             </div>
-            {tutorialCollapsed ? (
+            {tutorial.collapsed ? (
               <ChevronDown size={16} className="text-game-neon" />
             ) : (
               <ChevronUp size={16} className="text-game-neon" />
             )}
           </div>
-          {!tutorialCollapsed && (
+          {!tutorial.collapsed && (
             <div className="px-3 pb-3 space-y-2 border-t border-game-neon/20 pt-2">
               <div className="grid grid-cols-4 gap-2">
                 {tutorialSteps.map((step, idx) => (

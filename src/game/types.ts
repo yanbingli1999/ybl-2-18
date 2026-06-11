@@ -101,6 +101,14 @@ export interface IncomeRecord {
   details: string;
 }
 
+export interface TutorialProgress {
+  acceptedOrder: boolean;
+  pickedUpOrder: boolean;
+  deliveredOrder: boolean;
+  savedGame: boolean;
+  collapsed: boolean;
+}
+
 export interface GameState {
   player: PlayerState;
   vehicle: VehicleState;
@@ -118,6 +126,7 @@ export interface GameState {
   isRepairing: boolean;
   isResting: boolean;
   hasSavedGame: boolean;
+  tutorial: TutorialProgress;
 }
 
 export interface GameSave {
@@ -151,4 +160,5 @@ export type GameAction =
   | { type: 'CLEAR_PATH' }
   | { type: 'NEW_GAME' }
   | { type: 'LOAD_GAME'; save: GameSave }
-  | { type: 'GAME_OVER' };
+  | { type: 'GAME_OVER' }
+  | { type: 'TOGGLE_TUTORIAL' };
