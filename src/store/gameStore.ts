@@ -13,7 +13,7 @@ import {
   isNearRepairShop,
 } from '../game/VehicleSystem';
 import { calculateSettlement } from '../game/EconomySystem';
-import { saveGame, loadGame } from '../game/Storage';
+import { saveGame, loadGame, saveTutorialProgress, getTutorialProgress } from '../game/Storage';
 import {
   PLAYER_START,
   MAX_AVAILABLE_ORDERS,
@@ -22,6 +22,7 @@ import {
 
 export function createInitialState(): GameState {
   const map = generateMapData();
+  const tutorialProgress = getTutorialProgress();
   return {
     player: {
       id: 'player-1',
@@ -48,6 +49,7 @@ export function createInitialState(): GameState {
     isCharging: false,
     isRepairing: false,
     isResting: false,
+    hasSavedGame: tutorialProgress.savedGame,
   };
 }
 
@@ -365,12 +367,24 @@ export const useGameStore = create<GameStore>((set, get) => {
     orderGenerationTimer: 0,
 
     dispatch: (action) => {
-      set((state) => gameReducer(state, action));
+      set((state) => {
+        const newState = gameReducer(state, action);
+        if (action.type === 'ACCEPT_ORDER') {
+          saveTutorialProgress({ acceptedOrder: true });
+        }
+        if (action.type === 'PICKUP_ORDER') {
+          saveTutorialProgress({ pickedUpOrder: true });
+        }
+        if (action.type === 'DELIVER_ORDER') {
+          saveTutorialProgress({ deliveredOrder: true });
+        }
+        return newState;
+      });
     },
 
     save: () => {
       const state = get();
-      return saveGame(
+      const success = saveGame(
         state.player,
         state.vehicle,
         state.weather,
@@ -379,6 +393,11 @@ export const useGameStore = create<GameStore>((set, get) => {
         state.gameTime,
         state.map
       );
+      if (success) {
+        saveTutorialProgress({ savedGame: true });
+        set({ hasSavedGame: true });
+      }
+      return success;
     },
 
     load: () => {

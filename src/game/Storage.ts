@@ -1,5 +1,13 @@
 import { GameSave, PlayerState, VehicleState, WeatherState, Order, IncomeRecord, MapData } from './types';
-import { STORAGE_KEY, SAVE_VERSION } from './constants';
+import { STORAGE_KEY, SAVE_VERSION, TUTORIAL_KEY } from './constants';
+
+export interface TutorialProgress {
+  acceptedOrder: boolean;
+  pickedUpOrder: boolean;
+  deliveredOrder: boolean;
+  savedGame: boolean;
+  collapsed: boolean;
+}
 
 export function saveGame(
   player: PlayerState,
@@ -106,4 +114,46 @@ export function getSaveInfo(): { savedAt: number; completedOrders: number; money
     completedOrders: save.player.completedOrders,
     money: save.player.money,
   };
+}
+
+const defaultTutorialProgress: TutorialProgress = {
+  acceptedOrder: false,
+  pickedUpOrder: false,
+  deliveredOrder: false,
+  savedGame: false,
+  collapsed: false,
+};
+
+export function getTutorialProgress(): TutorialProgress {
+  try {
+    const json = localStorage.getItem(TUTORIAL_KEY);
+    if (!json) return { ...defaultTutorialProgress };
+    const saved = JSON.parse(json);
+    return { ...defaultTutorialProgress, ...saved };
+  } catch (error) {
+    console.error('Failed to load tutorial progress:', error);
+    return { ...defaultTutorialProgress };
+  }
+}
+
+export function saveTutorialProgress(progress: Partial<TutorialProgress>): boolean {
+  try {
+    const current = getTutorialProgress();
+    const merged = { ...current, ...progress };
+    localStorage.setItem(TUTORIAL_KEY, JSON.stringify(merged));
+    return true;
+  } catch (error) {
+    console.error('Failed to save tutorial progress:', error);
+    return false;
+  }
+}
+
+export function resetTutorialProgress(): boolean {
+  try {
+    localStorage.removeItem(TUTORIAL_KEY);
+    return true;
+  } catch (error) {
+    console.error('Failed to reset tutorial progress:', error);
+    return false;
+  }
 }

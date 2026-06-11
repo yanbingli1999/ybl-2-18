@@ -56,6 +56,7 @@ export const WEATHER_CHANGE_INTERVAL = 30000;
 
 export const STORAGE_KEY = 'city_delivery_game_save';
 export const SAVE_VERSION = '1.0.0';
+export const TUTORIAL_KEY = 'city_delivery_game_tutorial';
 
 export const LOCATION_NAMES = [
   '幸福小区', '阳光花园', '城市广场', '中心医院', '科技大厦',

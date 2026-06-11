@@ -117,6 +117,7 @@ export interface GameState {
   isCharging: boolean;
   isRepairing: boolean;
   isResting: boolean;
+  hasSavedGame: boolean;
 }
 
 export interface GameSave {
